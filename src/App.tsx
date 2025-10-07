@@ -9,13 +9,63 @@ import {
   ChevronRight, RefreshCw, ExternalLink, TrendingDown
 } from 'lucide-react';
 
+// ==== Types ====
+type Role = 'user' | 'admin';
+
+interface UserType {
+  email: string;
+  role: Role;
+}
+
+interface Match {
+  id: number;
+  league: string;
+  home: string;
+  away: string;
+  time: string;
+  selection: string;
+  odds: number;
+  confidence: number;
+}
+
+interface TodayPicks {
+  id: string;
+  date: string;
+  combined_odds: number;
+  status: string;
+  matches: Match[];
+}
+
+interface ArchivePick {
+  id: string;
+  date: string;
+  combined_odds: number;
+  status: string;
+  roi: number;
+}
+
+interface ArchiveStats {
+  totalPicks: number;
+  won: number;
+  lost: number;
+  winRate: number;
+  totalROI: number;
+}
+
+interface ArchiveData {
+  success: boolean;
+  picks: ArchivePick[];
+  stats: ArchiveStats;
+}
+
+
 // Mock API functions (replace with actual Cloudflare Workers API calls)
 const api = {
-  login: async (email, password) => {
+  login: async (email: string, password: string) => {
     // Mock implementation
     return { success: true, token: 'mock-token', user: { email, role: 'user' } };
   },
-  register: async (email, password) => {
+  register: async (email: string, password: string) => {
     return { success: true, token: 'mock-token', user: { email, role: 'user' } };
   },
   getTodaysPicks: async () => {
@@ -50,13 +100,13 @@ const api = {
 const App = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-  const [currentPage, setCurrentPage] = useState('home');
+  const [user, setUser] = useState<UserType | null>(null);
+  const [currentPage, setCurrentPage] = useState<'home'|'login'|'register'|'dashboard'|'archive'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [todaysPicks, setTodaysPicks] = useState(null);
-  const [archive, setArchive] = useState(null);
+  const [todaysPicks, setTodaysPicks] = useState<TodayPicks | null>(null);
+  const [archive, setArchive] = useState<ArchiveData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [authToken, setAuthToken] = useState(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   // Authentication persists only during the session (in-memory)
 
@@ -68,14 +118,18 @@ const App = () => {
     }
   }, [darkMode]);
 
-  const handleLogin = async (email, password) => {
+const handleLogin = async (email: string, password: string) => {
     setLoading(true);
     try {
       const response = await api.login(email, password);
       if (response.success) {
         setAuthToken(response.token);
         setIsAuthenticated(true);
-        setUser(response.user);
+        const typedUser: UserType = {
+  email: response.user.email,
+  role: response.user.role as Role, // cast string → Role ('user' | 'admin')
+};
+setUser(typedUser);
         setCurrentPage('dashboard');
       }
     } catch (error) {
@@ -320,21 +374,26 @@ const App = () => {
   );
 
   // Auth Pages
-  const AuthPage = ({ mode }) => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
+  interface AuthPageProps {
+  mode: 'login' | 'register';
+}
 
-    const handleSubmit = async () => {
-      if (mode === 'login') {
+const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+
+  const handleSubmit = async () => {
+    if (mode === 'login') {
+      await handleLogin(email, password);
+    } else {
+      const response = await api.register(email, password);
+      if (response.success) {
         await handleLogin(email, password);
-      } else {
-        const response = await api.register(email, password);
-        if (response.success) {
-          await handleLogin(email, password);
-        }
       }
-    };
+    }
+  };
+
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 flex items-center justify-center px-4">
@@ -481,7 +540,11 @@ const App = () => {
   };
 
   // Today's Picks Component
-  const TodaysPicks = ({ picks, loading, onRefresh }) => {
+  const TodaysPicks: React.FC<{
+  picks: TodayPicks | null;
+  loading: boolean;
+  onRefresh: () => void;
+}> = ({ picks, loading, onRefresh }) => {
     if (loading) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -539,7 +602,7 @@ const App = () => {
 
         {/* Matches */}
         <div className="grid gap-4">
-          {picks.matches.map(match => (
+          {picks.matches.map((match: Match) => (
             <div key={match.id} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
@@ -593,7 +656,10 @@ const App = () => {
   };
 
   // Archive View
-  const ArchiveView = ({ archive, loading }) => {
+  const ArchiveView: React.FC<{
+  archive: ArchiveData | null;
+  loading: boolean;
+}> = ({ archive, loading }) => {
     if (loading) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -641,7 +707,7 @@ const App = () => {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historical Picks</h2>
           </div>
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {archive.picks.map(pick => (
+            {archive.picks.map((pick: ArchivePick) => (
               <div key={pick.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
@@ -680,9 +746,10 @@ const App = () => {
     const [odds2, setOdds2] = useState(1.75);
     const [odds3, setOdds3] = useState(1.55);
 
-    const totalOdds = (odds1 * odds2 * odds3).toFixed(2);
-    const potentialReturn = (stake * totalOdds).toFixed(2);
-    const profit = (potentialReturn - stake).toFixed(2);
+    const totalOddsNum = (odds1 * odds2 * odds3);
+	const totalOdds = totalOddsNum.toFixed(2);
+	const potentialReturn = (stake * totalOddsNum).toFixed(2);
+	const profit = (Number(potentialReturn) - stake).toFixed(2);
 
     return (
       <div className="max-w-2xl mx-auto">
@@ -748,7 +815,7 @@ const App = () => {
   };
 
   // Profile View
-  const ProfileView = ({ user }) => {
+  const ProfileView: React.FC<{ user: UserType | null }> = ({ user }) => {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 border border-gray-200 dark:border-gray-700">
