@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AdminDashboard from './components/AdminDashboard';
 import { 
   Trophy, TrendingUp, Target, Calendar, Clock, BarChart3, 
   Settings, User, LogOut, Menu, X, Bell, Search, Filter,
@@ -101,7 +102,7 @@ const App = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<UserType | null>(null);
-  const [currentPage, setCurrentPage] = useState<'home'|'login'|'register'|'dashboard'|'archive'>('home');
+  const [currentPage, setCurrentPage] = useState<'home'|'login'|'register'|'dashboard'|'archive'|'admin-dashboard'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [todaysPicks, setTodaysPicks] = useState<TodayPicks | null>(null);
   const [archive, setArchive] = useState<ArchiveData | null>(null);
@@ -130,7 +131,7 @@ const handleLogin = async (email: string, password: string) => {
   role: response.user.role as Role, // cast string → Role ('user' | 'admin')
 };
 setUser(typedUser);
-        setCurrentPage('dashboard');
+        setCurrentPage(response.user.role === 'admin' ? 'admin-dashboard' : 'dashboard');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -856,13 +857,24 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
   // Main Render
   return (
-    <div className={darkMode ? 'dark' : ''}>
-      {!isAuthenticated && currentPage === 'home' && <LandingPage />}
-      {!isAuthenticated && currentPage === 'login' && <AuthPage mode="login" />}
-      {!isAuthenticated && currentPage === 'register' && <AuthPage mode="register" />}
-      {isAuthenticated && <Dashboard />}
-    </div>
-  );
+  <div className={darkMode ? 'dark' : ''}>
+    {!isAuthenticated && currentPage === 'home' && <LandingPage />}
+    {!isAuthenticated && currentPage === 'login' && <AuthPage mode="login" />}
+    {!isAuthenticated && currentPage === 'register' && <AuthPage mode="register" />}
+
+    {/* ✅ Regular authenticated dashboard */}
+    {isAuthenticated && currentPage === 'dashboard' && <Dashboard />}
+
+    {/* 🆕 Admin dashboard route (only for admin users) */}
+    {isAuthenticated && currentPage === 'admin-dashboard' && user?.role === 'admin' && (
+      <AdminDashboard
+        user={{ ...user, token: authToken ?? '' }}
+        darkMode={darkMode}
+      />
+    )}
+  </div>
+);
 };
+
 
 export default App;
