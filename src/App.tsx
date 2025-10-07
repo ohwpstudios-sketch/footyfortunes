@@ -62,13 +62,35 @@ interface ArchiveData {
 
 // Mock API functions (replace with actual Cloudflare Workers API calls)
 const api = {
+  // Login: mydaily2plusodds@gmail.com / angels2G9@84? -> role: 'admin', else 'user'
   login: async (email: string, password: string) => {
-    // Mock implementation
-    return { success: true, token: 'mock-token', user: { email, role: 'user' } };
+    const isAdmin =
+      email.trim().toLowerCase() === 'mydaily2plusodds@gmail.com' &&
+      password === 'angels2G9@84?';
+
+    return {
+      success: true,
+      token: 'mock-token',
+      user: {
+        email,
+        role: isAdmin ? ('admin' as const) : ('user' as const),
+      },
+    };
   },
+
+  // Register: everyone is created as a normal user in this mock
   register: async (email: string, password: string) => {
-    return { success: true, token: 'mock-token', user: { email, role: 'user' } };
+    return {
+      success: true,
+      token: 'mock-token',
+      user: {
+        email,
+        role: 'user' as const,
+      },
+    };
   },
+
+  // Today’s picks: demo payload
   getTodaysPicks: async () => {
     return {
       success: true,
@@ -78,24 +100,59 @@ const api = {
         combined_odds: 3.2,
         status: 'pending',
         matches: [
-          { id: 1, league: 'Premier League', home: 'Arsenal', away: 'Chelsea', time: '20:00', selection: 'Home Win', odds: 1.65, confidence: 85 },
-          { id: 2, league: 'La Liga', home: 'Barcelona', away: 'Real Madrid', time: '21:00', selection: 'Over 2.5', odds: 1.75, confidence: 78 },
-          { id: 3, league: 'Bundesliga', home: 'Bayern', away: 'Dortmund', time: '18:30', selection: 'BTTS', odds: 1.55, confidence: 82 }
-        ]
-      }
+          {
+            id: 1,
+            league: 'Premier League',
+            home: 'Arsenal',
+            away: 'Chelsea',
+            time: '20:00',
+            selection: 'Home Win',
+            odds: 1.65,
+            confidence: 85,
+          },
+          {
+            id: 2,
+            league: 'La Liga',
+            home: 'Barcelona',
+            away: 'Real Madrid',
+            time: '21:00',
+            selection: 'Over 2.5',
+            odds: 1.75,
+            confidence: 78,
+          },
+          {
+            id: 3,
+            league: 'Bundesliga',
+            home: 'Bayern',
+            away: 'Dortmund',
+            time: '18:30',
+            selection: 'BTTS',
+            odds: 1.55,
+            confidence: 82,
+          },
+        ],
+      },
     };
   },
+
+  // Archive: demo payload
   getArchive: async () => {
     return {
       success: true,
       picks: [
         { id: '1', date: '2025-10-06', combined_odds: 3.1, status: 'won', roi: 210 },
         { id: '2', date: '2025-10-05', combined_odds: 2.8, status: 'lost', roi: -100 },
-        { id: '3', date: '2025-10-04', combined_odds: 3.5, status: 'won', roi: 250 }
+        { id: '3', date: '2025-10-04', combined_odds: 3.5, status: 'won', roi: 250 },
       ],
-      stats: { totalPicks: 150, won: 95, lost: 55, winRate: 63.3, totalROI: 8500 }
+      stats: {
+        totalPicks: 150,
+        won: 95,
+        lost: 55,
+        winRate: 63.3,
+        totalROI: 8500,
+      },
     };
-  }
+  },
 };
 
 const App = () => {
