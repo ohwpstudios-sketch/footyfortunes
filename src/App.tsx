@@ -205,30 +205,36 @@ useEffect(() => {
 const handleLogin = async (email: string, password: string) => {
   setLoading(true);
   try {
-    const response = await apiService.login(email, password);
+    // axios-style: returns { data }
+    const { data } = await apiService.login(email, password);
 
-    if (response.ok && response.data.success) {
-      // Save session using authService
-      authService.saveSession(response.data.token, response.data.user);
-      
+    if (data.success) {
+      // Type the user for TS
+      const typedUser: UserType = {
+        email: data.user.email,
+        role: data.user.role as Role,
+      };
+
+      // Save session using the single-argument (object) form
+      authService.saveSession({ token: data.token, user: typedUser });
+
       setIsAuthenticated(true);
-      setUser(response.data.user);
-      
+      setUser(typedUser);
+
       // Route based on role
-      if (response.data.user.role === 'admin') {
-        setCurrentPage('admin-dashboard');
-      } else {
-        setCurrentPage('dashboard');
-      }
+      setCurrentPage(typedUser.role === 'admin' ? 'admin-dashboard' : 'dashboard');
     } else {
-      alert(response.data.error || 'Login failed');
+      // data.error is optional; fall back to a generic message
+      alert(data.error ?? 'Login failed');
     }
   } catch (error) {
     console.error('Login error:', error);
     alert('Login failed. Please try again.');
+  } finally {
+    setLoading(false);
   }
-  setLoading(false);
 };
+
 
   const handleLogout = () => {
   authService.clearSession();

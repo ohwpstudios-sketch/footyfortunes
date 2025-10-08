@@ -9,6 +9,7 @@ export interface LoginResponseData {
   success: boolean;
   token: string;
   user: { email: string; role: 'user' | 'admin' };
+  error?: string; // optional error message returned by API
 }
 
 declare const apiService: {
@@ -17,10 +18,10 @@ declare const apiService: {
   put<T = any>(path: string, body?: any, opts?: RequestOptions): Promise<T>;
   del<T = any>(path: string, opts?: RequestOptions): Promise<T>;
 
-  // Declare the method you’re using in App.tsx:
+  // matches how App.tsx uses it
   login(email: string, password: string): Promise<{ data: LoginResponseData }>;
 
-  // Optional namespaces if your JS file exposes them; leave as any if unsure
+  // optional namespaces; keep as any if not using
   auth?: any;
   admin?: any;
   picks?: any;

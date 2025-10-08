@@ -1,0 +1,22 @@
+# wrangler.toml - Cloudflare Worker Configuration
+
+name = "footyfortunes-api"
+main = "index.js"
+compatibility_date = "2024-10-07"
+nodejs_compat = true
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "footyfortunes_db"
+database_id = "99e46361-ea02-43c9-b70c-745752d72a09"  # Replace after creating D1 database
+
+# KV Namespace for caching
+[[kv_namespaces]]
+binding = "CACHE"
+id = "b95d92052415416c9011c4fee4ddf145"  # Replace after creating KV namespace
+
+# KV Namespace for picks
+[[kv_namespaces]]
+binding = "PICKS_KV"
+id = "3d88a8861e734c2eb19e76e9d112c8cb"  # Replace
