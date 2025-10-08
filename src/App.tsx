@@ -172,7 +172,7 @@ const App = () => {
 useEffect(() => {
   const authState = authService.initializeAuth();
 
-  if (authState.isAuthenticated) {
+  if (authState.isAuthenticated && authState.user) {
     setIsAuthenticated(true);
 
     // Ensure the user matches your TypeScript types

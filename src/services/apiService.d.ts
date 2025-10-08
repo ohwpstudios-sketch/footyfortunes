@@ -5,18 +5,56 @@ export interface RequestOptions {
   auth?: boolean; // include Authorization header
 }
 
+export interface LoginResponseData {
+  success: boolean;
+  token: string;
+  user: { email: string; role: 'user' | 'admin' };
+}
+
 declare const apiService: {
   get<T = any>(path: string, opts?: RequestOptions): Promise<T>;
   post<T = any>(path: string, body?: any, opts?: RequestOptions): Promise<T>;
   put<T = any>(path: string, body?: any, opts?: RequestOptions): Promise<T>;
   del<T = any>(path: string, opts?: RequestOptions): Promise<T>;
 
-  // (Optional) namespaced helpers if your real file exports them
-  auth?: {
-    login?(email: string, password: string): Promise<{ success: boolean; token: string; user: { email: string; role: 'user' | 'admin' } }>;
-  };
+  // Declare the method you’re using in App.tsx:
+  login(email: string, password: string): Promise<{ data: LoginResponseData }>;
+
+  // Optional namespaces if your JS file exposes them; leave as any if unsure
+  auth?: any;
   admin?: any;
   picks?: any;
 };
 
 export default apiService;
+
+
+// src/services/authService.d.ts
+export type Role = 'user' | 'admin';
+
+export interface AuthUser {
+  email: string;
+  role: Role;
+}
+
+export interface AuthState {
+  isAuthenticated: boolean;
+  user: AuthUser | null;
+  token?: string | null;
+  expiresAt?: number | null;
+}
+
+declare const authService: {
+  initializeAuth(): AuthState;
+
+  // Your current call style: saveSession(token, user)
+  saveSession(token: string, user: AuthUser): void;
+
+  // Also support object form if you later switch to it
+  saveSession(session: { token: string; user: AuthUser; expiresAt?: number | null }): void;
+
+  clearSession(): void;
+};
+
+export default authService;
+
