@@ -1,4 +1,5 @@
 // AdminDashboard.jsx
+import apiService from '../services/apiService';
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Edit2, Trash2, Save, X, Upload, Download, Users, 
@@ -58,25 +59,42 @@ const AdminDashboard = ({ user, darkMode }) => {
   }, []);
 
   const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      // Mock API calls - replace with actual API
-      const [picksData, usersData, subscribersData, statsData] = await Promise.all([
-        fetchPicks(),
-        fetchUsers(),
-        fetchSubscribers(),
-        fetchStats()
-      ]);
-      
-      setPicks(picksData);
-      setUsers(usersData);
-      setSubscribers(subscribersData);
-      setStats(statsData);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
+  setLoading(true);
+  try {
+    const [statsRes, picksRes, usersRes, subscribersRes] = await Promise.all([
+      apiService.admin.getStats(),
+      apiService.admin.getAllPicks(),
+      apiService.admin.getAllUsers(),
+      apiService.admin.getAllSubscribers()
+    ]);
+
+    if (statsRes.ok) {
+      setStats(statsRes.data.stats || {
+        totalUsers: 0,
+        totalPicks: 0,
+        winRate: 0,
+        totalROI: 0,
+        activeSubscribers: 0
+      });
     }
-    setLoading(false);
-  };
+
+    if (picksRes.ok) {
+      setPicks(picksRes.data.picks || []);
+    }
+
+    if (usersRes.ok) {
+      setUsers(usersRes.data.users || []);
+    }
+
+    if (subscribersRes.ok) {
+      setSubscribers(subscribersRes.data.subscribers || []);
+    }
+  } catch (error) {
+    console.error('Error loading dashboard data:', error);
+    alert('Failed to load dashboard data. Please refresh.');
+  }
+  setLoading(false);
+};
 
   // Mock API functions (replace with actual Cloudflare Worker API calls)
   const fetchPicks = async () => {
@@ -161,84 +179,81 @@ const AdminDashboard = ({ user, darkMode }) => {
   };
 
   const savePick = async () => {
-    if (currentPick.matches.length === 0) {
-      alert('Please add at least one match');
-      return;
-    }
+  if (currentPick.matches.length === 0) {
+    alert('Please add at least one match');
+    return;
+  }
 
-    setLoading(true);
-    try {
-      // API call to save pick
-      const response = await fetch('/api/admin/picks/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        },
-        body: JSON.stringify(currentPick)
+  setLoading(true);
+  try {
+    const response = await apiService.admin.createPick({
+      date: currentPick.date,
+      matches: currentPick.matches,
+      combined_odds: currentPick.combined_odds,
+      status: 'pending'
+    });
+
+    if (response.ok) {
+      alert('✅ Pick saved successfully!');
+      setIsCreatingPick(false);
+      setCurrentPick({
+        date: new Date().toISOString().split('T')[0],
+        matches: [],
+        combined_odds: 0,
+        status: 'pending'
       });
-
-      if (response.ok) {
-        alert('Pick saved successfully!');
-        setIsCreatingPick(false);
-        setCurrentPick({
-          date: new Date().toISOString().split('T')[0],
-          matches: [],
-          combined_odds: 0,
-          status: 'pending'
-        });
-        loadDashboardData();
-      }
-    } catch (error) {
-      console.error('Error saving pick:', error);
-      alert('Failed to save pick');
+      await loadDashboardData();
+    } else {
+      alert(`❌ Failed to save pick: ${response.data.error || 'Unknown error'}`);
     }
-    setLoading(false);
-  };
+  } catch (error) {
+    console.error('Error saving pick:', error);
+    alert('❌ Failed to save pick. Please try again.');
+  }
+  setLoading(false);
+};
 
   const updatePickResult = async (pickId, result) => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/admin/picks/update-result', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        },
-        body: JSON.stringify({ pickId, result })
-      });
+  const finalScore = prompt('Enter final score (optional, e.g., 2-1):');
+  
+  setLoading(true);
+  try {
+    const response = await apiService.admin.updatePickResult(pickId, result, finalScore);
 
-      if (response.ok) {
-        alert('Pick result updated!');
-        loadDashboardData();
-      }
-    } catch (error) {
-      console.error('Error updating result:', error);
+    if (response.ok) {
+      alert(`✅ Pick marked as ${result}!`);
+      await loadDashboardData();
+    } else {
+      alert(`❌ Failed to update result: ${response.data.error || 'Unknown error'}`);
     }
-    setLoading(false);
-  };
+  } catch (error) {
+    console.error('Error updating result:', error);
+    alert('❌ Failed to update result. Please try again.');
+  }
+  setLoading(false);
+};
 
   const deletePick = async (pickId) => {
-    if (!confirm('Are you sure you want to delete this pick?')) return;
+  if (!confirm('⚠️ Are you sure you want to delete this pick?')) {
+    return;
+  }
 
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/admin/picks/${pickId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${user.token}`
-        }
-      });
+  setLoading(true);
+  try {
+    const response = await apiService.admin.deletePick(pickId);
 
-      if (response.ok) {
-        alert('Pick deleted successfully!');
-        loadDashboardData();
-      }
-    } catch (error) {
-      console.error('Error deleting pick:', error);
+    if (response.ok) {
+      alert('✅ Pick deleted successfully!');
+      await loadDashboardData();
+    } else {
+      alert(`❌ Failed to delete pick: ${response.data.error || 'Unknown error'}`);
     }
-    setLoading(false);
-  };
+  } catch (error) {
+    console.error('Error deleting pick:', error);
+    alert('❌ Failed to delete pick. Please try again.');
+  }
+  setLoading(false);
+};
 
   const autoDetectFixtureIds = async () => {
     setLoading(true);
@@ -268,66 +283,60 @@ const AdminDashboard = ({ user, darkMode }) => {
 
   // User Management Functions
   const updateUserRole = async (userId, newRole) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/role`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        },
-        body: JSON.stringify({ role: newRole })
-      });
+  setLoading(true);
+  try {
+    const response = await apiService.admin.updateUserRole(userId, newRole);
 
-      if (response.ok) {
-        loadDashboardData();
-      }
-    } catch (error) {
-      console.error('Error updating user role:', error);
+    if (response.ok) {
+      alert(`✅ User role updated to ${newRole}!`);
+      await loadDashboardData();
+    } else {
+      alert(`❌ Failed to update role: ${response.data.error || 'Unknown error'}`);
     }
-  };
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    alert('❌ Failed to update role. Please try again.');
+  }
+  setLoading(false);
+};
 
   const toggleUserStatus = async (userId, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
-    
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
+  const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+  
+  setLoading(true);
+  try {
+    const response = await apiService.admin.updateUserStatus(userId, newStatus);
 
-      if (response.ok) {
-        loadDashboardData();
-      }
-    } catch (error) {
-      console.error('Error updating user status:', error);
+    if (response.ok) {
+      alert(`✅ User ${newStatus === 'active' ? 'activated' : 'suspended'}!`);
+      await loadDashboardData();
+    } else {
+      alert(`❌ Failed to update status: ${response.data.error || 'Unknown error'}`);
     }
-  };
+  } catch (error) {
+    console.error('Error updating user status:', error);
+    alert('❌ Failed to update status. Please try again.');
+  }
+  setLoading(false);
+};
 
   // Settings Functions
   const saveSettings = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        },
-        body: JSON.stringify(platformSettings)
-      });
+  setLoading(true);
+  try {
+    const response = await apiService.admin.updateSettings(platformSettings);
 
-      if (response.ok) {
-        alert('Settings saved successfully!');
-      }
-    } catch (error) {
-      console.error('Error saving settings:', error);
+    if (response.ok) {
+      alert('✅ Settings saved successfully!');
+    } else {
+      alert(`❌ Failed to save settings: ${response.data.error || 'Unknown error'}`);
     }
-    setLoading(false);
-  };
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    alert('❌ Failed to save settings. Please try again.');
+  }
+  setLoading(false);
+};
 
   const uploadFile = async (file, type) => {
     const formData = new FormData();
@@ -379,6 +388,21 @@ const AdminDashboard = ({ user, darkMode }) => {
       <span className="font-medium">{label}</span>
     </button>
   );
+  
+  useEffect(() => {
+  const loadSettings = async () => {
+    try {
+      const response = await apiService.admin.getSettings();
+      if (response.ok && response.data.settings) {
+        setPlatformSettings(response.data.settings);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+  
+  loadSettings();
+}, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

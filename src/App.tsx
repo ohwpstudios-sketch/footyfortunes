@@ -1,3 +1,5 @@
+import authService from './services/authService';
+import apiService from './services/apiService';
 import React, { useState, useEffect } from 'react';
 import AdminDashboard from './components/AdminDashboard';
 import { 
@@ -165,6 +167,30 @@ const App = () => {
   const [archive, setArchive] = useState<ArchiveData | null>(null);
   const [loading, setLoading] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  
+  // Initialize authentication on app load
+useEffect(() => {
+  const authState = authService.initializeAuth();
+
+  if (authState.isAuthenticated && authState.user) {
+    setIsAuthenticated(true);
+
+    // Ensure the user matches your TypeScript types
+    const typedUser: UserType = {
+      email: authState.user.email,
+      role: authState.user.role as Role,
+    };
+    setUser(typedUser);
+
+    // Redirect admin users to admin dashboard; others to dashboard
+    if (authState.user.role === 'admin') {
+      setCurrentPage('admin-dashboard');
+    } else {
+      setCurrentPage('dashboard');
+    }
+  }
+}, []);
+
 
   // Authentication persists only during the session (in-memory)
 
@@ -177,31 +203,45 @@ const App = () => {
   }, [darkMode]);
 
 const handleLogin = async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      const response = await api.login(email, password);
-      if (response.success) {
-        setAuthToken(response.token);
-        setIsAuthenticated(true);
-        const typedUser: UserType = {
-  email: response.user.email,
-  role: response.user.role as Role, // cast string → Role ('user' | 'admin')
-};
-setUser(typedUser);
-        setCurrentPage(response.user.role === 'admin' ? 'admin-dashboard' : 'dashboard');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
+  setLoading(true);
+  try {
+    // axios-style: returns { data }
+    const { data } = await apiService.login(email, password);
+
+    if (data.success) {
+      // Type the user for TS
+      const typedUser: UserType = {
+        email: data.user.email,
+        role: data.user.role as Role,
+      };
+
+      // Save session using the single-argument (object) form
+      authService.saveSession({ token: data.token, user: typedUser });
+
+      setIsAuthenticated(true);
+      setUser(typedUser);
+
+      // Route based on role
+      setCurrentPage(typedUser.role === 'admin' ? 'admin-dashboard' : 'dashboard');
+    } else {
+      // data.error is optional; fall back to a generic message
+      alert(data.error ?? 'Login failed');
     }
+  } catch (error) {
+    console.error('Login error:', error);
+    alert('Login failed. Please try again.');
+  } finally {
     setLoading(false);
-  };
+  }
+};
+
 
   const handleLogout = () => {
-    setAuthToken(null);
-    setIsAuthenticated(false);
-    setUser(null);
-    setCurrentPage('home');
-  };
+  authService.clearSession();
+  setIsAuthenticated(false);
+  setUser(null);
+  setCurrentPage('home');
+};
 
   const loadTodaysPicks = async () => {
     setLoading(true);
