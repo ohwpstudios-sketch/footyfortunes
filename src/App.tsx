@@ -12,6 +12,8 @@ import {
   ChevronRight, RefreshCw, ExternalLink, TrendingDown
 } from 'lucide-react';
 
+console.log('API URL:', import.meta.env.VITE_API_URL);
+
 // ==== Types ====
 type Role = 'user' | 'admin';
 

@@ -1,113 +1,251 @@
-// authService.js - Create this new file in your src/services folder
+// authService.js - Complete Authentication Service
+// Handles user authentication, session management, and persistence
 
-// In-memory session storage (persists during browser session only)
-let sessionData = {
+const SESSION_KEY = 'footy_session';
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// In-memory session cache
+let sessionCache = {
   token: null,
   user: null,
   expiresAt: null
 };
 
-// Session duration: 24 hours
-const SESSION_DURATION = 24 * 60 * 60 * 1000;
-
 export const authService = {
-  // Initialize auth from session storage on app load
+  /**
+   * Initialize authentication on app load
+   * Call this in your App.tsx useEffect on mount
+   * @returns {Object} { isAuthenticated, user, token }
+   */
   initializeAuth: () => {
-    try {
-      // Try to get session from sessionStorage (browser-based, cleared on tab close)
-      const storedSession = sessionStorage.getItem('footy_session');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        
-        // Check if session is still valid
-        if (parsed.expiresAt && new Date(parsed.expiresAt) > new Date()) {
-          sessionData = parsed;
-          return {
-            isAuthenticated: true,
-            user: parsed.user,
-            token: parsed.token
-          };
-        } else {
-          // Session expired, clear it
-          authService.clearSession();
-        }
-      }
-    } catch (error) {
-      console.error('Error initializing auth:', error);
-    }
+    console.log('🔄 Initializing auth from storage...');
     
-    return {
-      isAuthenticated: false,
-      user: null,
-      token: null
-    };
+    try {
+      // Try to restore session from sessionStorage
+      const storedSession = sessionStorage.getItem(SESSION_KEY);
+      
+      if (!storedSession) {
+        console.log('ℹ️ No stored session found');
+        return {
+          isAuthenticated: false,
+          user: null,
+          token: null
+        };
+      }
+
+      // Parse stored session
+      const parsed = JSON.parse(storedSession);
+      
+      // Check if session has expired
+      if (parsed.expiresAt && new Date(parsed.expiresAt) <= new Date()) {
+        console.log('⏰ Session expired, clearing...');
+        authService.clearSession();
+        return {
+          isAuthenticated: false,
+          user: null,
+          token: null
+        };
+      }
+
+      // Session is valid, restore it
+      sessionCache = parsed;
+      console.log('✅ Session restored successfully');
+      console.log('👤 User:', parsed.user?.email || parsed.user?.name);
+      console.log('🔑 Role:', parsed.user?.role);
+      
+      return {
+        isAuthenticated: true,
+        user: parsed.user,
+        token: parsed.token
+      };
+      
+    } catch (error) {
+      console.error('❌ Error initializing auth:', error);
+      authService.clearSession();
+      return {
+        isAuthenticated: false,
+        user: null,
+        token: null
+      };
+    }
   },
 
-  // Save session after successful login
+  /**
+   * Save session after successful login
+   * @param {string} token - JWT token from backend
+   * @param {Object} user - User object { id, email, name, role }
+   */
   saveSession: (token, user) => {
+    console.log('💾 Saving session...');
+    
+    if (!token || !user) {
+      console.error('❌ Invalid session data - token or user missing');
+      return null;
+    }
+
     const expiresAt = new Date(Date.now() + SESSION_DURATION).toISOString();
     
-    sessionData = {
+    sessionCache = {
       token,
       user,
       expiresAt
     };
 
-    // Store in sessionStorage (survives page refresh but not browser close)
     try {
-      sessionStorage.setItem('footy_session', JSON.stringify(sessionData));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionCache));
+      console.log('✅ Session saved successfully');
+      console.log('👤 User:', user.email || user.name);
+      console.log('🔑 Role:', user.role);
+      console.log('⏰ Expires:', new Date(expiresAt).toLocaleString());
     } catch (error) {
-      console.error('Error saving session:', error);
+      console.error('❌ Error saving session to storage:', error);
     }
 
-    return sessionData;
+    return sessionCache;
   },
 
-  // Get current session
+  /**
+   * Get current session
+   * Checks validity and returns session or null
+   * @returns {Object|null} Session object or null if expired/invalid
+   */
   getSession: () => {
-    // Check if session is still valid
-    if (sessionData.expiresAt && new Date(sessionData.expiresAt) < new Date()) {
+    // Check if session exists in cache
+    if (!sessionCache.token || !sessionCache.user) {
+      // Try to restore from storage
+      const restored = authService.initializeAuth();
+      if (!restored.isAuthenticated) {
+        return null;
+      }
+    }
+
+    // Check if session has expired
+    if (sessionCache.expiresAt && new Date(sessionCache.expiresAt) <= new Date()) {
+      console.log('⏰ Session expired');
       authService.clearSession();
       return null;
     }
-    return sessionData;
+
+    return sessionCache;
   },
 
-  // Clear session on logout
+  /**
+   * Get current user
+   * @returns {Object|null} User object or null
+   */
+  getUser: () => {
+    const session = authService.getSession();
+    return session?.user || null;
+  },
+
+  /**
+   * Get current token
+   * @returns {string|null} JWT token or null
+   */
+  getToken: () => {
+    const session = authService.getSession();
+    return session?.token || null;
+  },
+
+  /**
+   * Check if user is authenticated
+   * @returns {boolean}
+   */
+  isAuthenticated: () => {
+    const session = authService.getSession();
+    return !!(session && session.token && session.user);
+  },
+
+  /**
+   * Check if current user is admin
+   * @returns {boolean}
+   */
+  isAdmin: () => {
+    const session = authService.getSession();
+    return session?.user?.role === 'admin';
+  },
+
+  /**
+   * Clear session on logout
+   */
   clearSession: () => {
-    sessionData = {
+    console.log('🗑️ Clearing session...');
+    
+    sessionCache = {
       token: null,
       user: null,
       expiresAt: null
     };
     
     try {
-      sessionStorage.removeItem('footy_session');
+      sessionStorage.removeItem(SESSION_KEY);
+      console.log('✅ Session cleared');
     } catch (error) {
-      console.error('Error clearing session:', error);
+      console.error('❌ Error clearing session:', error);
     }
   },
 
-  // Check if user is admin
-  isAdmin: () => {
-    const session = authService.getSession();
-    return session?.user?.role === 'admin';
+  /**
+   * Logout user and redirect to home
+   */
+  logout: () => {
+    console.log('🚪 Logging out...');
+    authService.clearSession();
+    window.location.href = '/';
   },
 
-  // Get auth header for API calls
+  /**
+   * Get authorization header for API calls
+   * @returns {Object} Headers object with Authorization if logged in
+   */
   getAuthHeader: () => {
     const session = authService.getSession();
+    
     if (session?.token) {
       return {
         'Authorization': `Bearer ${session.token}`,
         'Content-Type': 'application/json'
       };
     }
+    
     return {
       'Content-Type': 'application/json'
     };
+  },
+
+  /**
+   * Check if session needs refresh (expires in less than 1 hour)
+   * @returns {boolean}
+   */
+  needsRefresh: () => {
+    const session = authService.getSession();
+    if (!session?.expiresAt) return false;
+    
+    const expiresAt = new Date(session.expiresAt);
+    const oneHourFromNow = new Date(Date.now() + (60 * 60 * 1000));
+    
+    return expiresAt < oneHourFromNow;
+  },
+
+  /**
+   * Debug method - prints current session state
+   */
+  debugSession: () => {
+    console.log('=== AUTH DEBUG ===');
+    console.log('Cache:', sessionCache);
+    console.log('Storage:', sessionStorage.getItem(SESSION_KEY));
+    console.log('Is Authenticated:', authService.isAuthenticated());
+    console.log('Is Admin:', authService.isAdmin());
+    console.log('User:', authService.getUser());
+    console.log('Token:', authService.getToken());
+    console.log('==================');
   }
 };
 
-// Export for use in components
+// Auto-initialize on import (optional, but helpful)
+if (typeof window !== 'undefined') {
+  // Only run in browser environment
+  authService.initializeAuth();
+}
+
 export default authService;

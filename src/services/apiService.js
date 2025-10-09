@@ -3,7 +3,9 @@
 import authService from './authService';
 
 // Get API base URL from environment or use default
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = 'https://footyfortunes-api.ghwmelite.workers.dev';
+console.log('🔍 API_BASE_URL:', API_BASE_URL);
+console.log('🔍 VITE_API_URL:', import.meta.env.VITE_API_URL);
 
 // Generic fetch wrapper with error handling
 const apiFetch = async (endpoint, options = {}) => {
@@ -39,14 +41,14 @@ const apiFetch = async (endpoint, options = {}) => {
 export const apiService = {
   // ============ AUTH ENDPOINTS ============
   login: async (email, password) => {
-    return apiFetch('/auth/login', {
+    return apiFetch('/api/auth/login', {  // ✅ FIXED - Added /api
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
   },
 
   register: async (email, password) => {
-    return apiFetch('/auth/register', {
+    return apiFetch('/api/auth/register', {  // ✅ FIXED - Added /api
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
@@ -54,19 +56,19 @@ export const apiService = {
 
   // ============ PICKS ENDPOINTS ============
   getTodaysPicks: async () => {
-    return apiFetch('/picks/today', {
+    return apiFetch('/api/picks/today', {
       method: 'GET'
     });
   },
 
   getPickById: async (pickId) => {
-    return apiFetch(`/picks/${pickId}`, {
+    return apiFetch(`/api/picks/${pickId}`, {
       method: 'GET'
     });
   },
 
   getArchive: async (limit = 50, offset = 0) => {
-    return apiFetch(`/picks/archive?limit=${limit}&offset=${offset}`, {
+    return apiFetch(`/api/picks/archive?limit=${limit}&offset=${offset}`, {
       method: 'GET'
     });
   },
@@ -75,47 +77,47 @@ export const apiService = {
   admin: {
     // Get dashboard stats
     getStats: async () => {
-      return apiFetch('/admin/stats', {
+      return apiFetch('/api/admin/stats', {
         method: 'GET'
       });
     },
 
     // PICK MANAGEMENT
     getAllPicks: async () => {
-      return apiFetch('/admin/picks', {
+      return apiFetch('/api/admin/picks', {
         method: 'GET'
       });
     },
 
     createPick: async (pickData) => {
-      return apiFetch('/admin/picks', {
+      return apiFetch('/api/admin/picks', {
         method: 'POST',
         body: JSON.stringify(pickData)
       });
     },
 
     updatePick: async (pickId, pickData) => {
-      return apiFetch(`/admin/picks/${pickId}`, {
+      return apiFetch(`/api/admin/picks/${pickId}`, {
         method: 'PUT',
         body: JSON.stringify(pickData)
       });
     },
 
     deletePick: async (pickId) => {
-      return apiFetch(`/admin/picks/${pickId}`, {
+      return apiFetch(`/api/admin/picks/${pickId}`, {
         method: 'DELETE'
       });
     },
 
     updatePickResult: async (pickId, result, finalScore = null) => {
-      return apiFetch('/admin/picks/update-result', {
+      return apiFetch('/api/admin/picks/update-result', {
         method: 'POST',
         body: JSON.stringify({ pickId, result, finalScore })
       });
     },
 
     autoDetectFixtures: async (matches) => {
-      return apiFetch('/admin/picks/auto-detect-fixtures', {
+      return apiFetch('/api/admin/picks/auto-detect-fixtures', {
         method: 'POST',
         body: JSON.stringify({ matches })
       });
@@ -123,53 +125,53 @@ export const apiService = {
 
     // USER MANAGEMENT
     getAllUsers: async () => {
-      return apiFetch('/admin/users', {
+      return apiFetch('/api/admin/users', {
         method: 'GET'
       });
     },
 
     updateUserRole: async (userId, role) => {
-      return apiFetch(`/admin/users/${userId}/role`, {
+      return apiFetch(`/api/admin/users/${userId}/role`, {
         method: 'PUT',
         body: JSON.stringify({ role })
       });
     },
 
     updateUserStatus: async (userId, status) => {
-      return apiFetch(`/admin/users/${userId}/status`, {
+      return apiFetch(`/api/admin/users/${userId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status })
       });
     },
 
     deleteUser: async (userId) => {
-      return apiFetch(`/admin/users/${userId}`, {
+      return apiFetch(`/api/admin/users/${userId}`, {
         method: 'DELETE'
       });
     },
 
     // SUBSCRIBER MANAGEMENT
     getAllSubscribers: async () => {
-      return apiFetch('/admin/subscribers', {
+      return apiFetch('/api/admin/subscribers', {
         method: 'GET'
       });
     },
 
     deleteSubscriber: async (subscriberId) => {
-      return apiFetch(`/admin/subscribers/${subscriberId}`, {
+      return apiFetch(`/api/admin/subscribers/${subscriberId}`, {
         method: 'DELETE'
       });
     },
 
     // SETTINGS
     getSettings: async () => {
-      return apiFetch('/admin/settings', {
+      return apiFetch('/api/admin/settings', {
         method: 'GET'
       });
     },
 
     updateSettings: async (settings) => {
-      return apiFetch('/admin/settings', {
+      return apiFetch('/api/admin/settings', {
         method: 'PUT',
         body: JSON.stringify(settings)
       });
@@ -180,7 +182,7 @@ export const apiService = {
       formData.append('file', file);
       formData.append('type', type);
 
-      return fetch(`${API_BASE_URL}/admin/upload`, {
+      return fetch(`${API_BASE_URL}/api/admin/upload`, {
         method: 'POST',
         headers: {
           'Authorization': authService.getAuthHeader().Authorization
@@ -192,14 +194,14 @@ export const apiService = {
 
   // ============ SUBSCRIPTION ENDPOINTS ============
   subscribe: async (email, preferences) => {
-    return apiFetch('/subscribe', {
+    return apiFetch('/api/subscribe', {
       method: 'POST',
       body: JSON.stringify({ email, preferences })
     });
   },
 
   unsubscribe: async (email) => {
-    return apiFetch('/unsubscribe', {
+    return apiFetch('/api/unsubscribe', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
