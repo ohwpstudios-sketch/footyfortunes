@@ -225,27 +225,42 @@ const [newUser, setNewUser] = useState({
   try {
     let response;
     
-    // Check if we're editing or creating
+    // FIXED: Clean matches data before sending to API
+    const cleanMatches = currentPick.matches.map(match => ({
+      league: match.league,
+      home: match.home,
+      away: match.away,
+      time: match.time,
+      selection: match.selection,
+      odds: match.odds,
+      confidence: match.confidence,
+      fixture_id: match.fixture_id || null
+    }));
+    
     if (editingPick && currentPick.id) {
-      // Update existing pick
+      // UPDATE MODE: Editing existing pick
+      console.log('📝 Updating pick:', currentPick.id);
       response = await apiService.admin.updatePick(currentPick.id, {
         date: currentPick.date,
-        matches: currentPick.matches,
+        matches: cleanMatches,
         combined_odds: currentPick.combined_odds,
         status: currentPick.status
       });
     } else {
-      // Create new pick
+      // CREATE MODE: New pick
+      console.log('➕ Creating new pick');
       response = await apiService.admin.createPick({
         date: currentPick.date,
-        matches: currentPick.matches,
+        matches: cleanMatches,
         combined_odds: currentPick.combined_odds,
         status: 'pending'
       });
     }
-
-    if (response.ok && response.data.success) {
+    
+	if (response.ok && response.data.success) {
       alert(editingPick ? '✅ Pick updated successfully!' : '✅ Pick saved successfully!');
+      
+      // FIXED: Properly reset ALL state
       setIsCreatingPick(false);
       setEditingPick(null);
       setCurrentPick({
@@ -254,8 +269,24 @@ const [newUser, setNewUser] = useState({
         combined_odds: 0,
         status: 'pending'
       });
+      
+      // FIXED: Also reset the new match form
+      setNewMatch({
+        league: '',
+        home: '',
+        away: '',
+        time: '',
+        selection: '',
+        odds: '',
+        confidence: 80,
+        fixture_id: ''
+      });
+      
+      // Reload picks list to show updated data
       await loadDashboardData();
-    } else {
+    }
+    
+	else {
       alert(`❌ Failed to ${editingPick ? 'update' : 'save'} pick: ${response.data.error || 'Unknown error'}`);
     }
   } catch (error) {
@@ -307,11 +338,17 @@ const [newUser, setNewUser] = useState({
     setLoading(false);
   };
   
-  const editPick = (pick) => {
+const editPick = (pick) => {
+  // FIXED: Add temporary IDs to existing matches for UI consistency
+  const matchesWithIds = (pick.matches || []).map((match, index) => ({
+    ...match,
+    id: match.id || `existing_${index}_${Date.now()}`
+  }));
+  
   setCurrentPick({
     id: pick.id,
     date: pick.date,
-    matches: pick.matches || [],
+    matches: matchesWithIds,
     combined_odds: pick.combined_odds,
     status: pick.status
   });
@@ -597,7 +634,7 @@ const [newUser, setNewUser] = useState({
               <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-200 dark:border-gray-700">
                 <div className="flex justify-between items-center mb-4 md:mb-6">
                   <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
-  {editingPick ? 'Edit Pick' : 'Create New Pick'} (Target: 3.00 Odds)
+  {editingPick ? '✏️ Edit Pick' : '➕ Create New Pick'} (Target: 3.00 Odds)
 </h3>
                   <button
                     onClick={() => {
