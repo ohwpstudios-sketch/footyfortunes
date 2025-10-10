@@ -1,5 +1,4 @@
-// authService.js - Complete Authentication Service
-// Handles user authentication, session management, and persistence
+// authService.js - Complete Authentication Service with Debugging
 
 const SESSION_KEY = 'footy_session';
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -14,14 +13,11 @@ let sessionCache = {
 export const authService = {
   /**
    * Initialize authentication on app load
-   * Call this in your App.tsx useEffect on mount
-   * @returns {Object} { isAuthenticated, user, token }
    */
   initializeAuth: () => {
     console.log('🔄 Initializing auth from storage...');
     
     try {
-      // Try to restore session from sessionStorage
       const storedSession = sessionStorage.getItem(SESSION_KEY);
       
       if (!storedSession) {
@@ -33,7 +29,6 @@ export const authService = {
         };
       }
 
-      // Parse stored session
       const parsed = JSON.parse(storedSession);
       
       // Check if session has expired
@@ -50,8 +45,9 @@ export const authService = {
       // Session is valid, restore it
       sessionCache = parsed;
       console.log('✅ Session restored successfully');
-      console.log('👤 User:', parsed.user?.email || parsed.user?.name);
+      console.log('👤 User:', parsed.user?.email);
       console.log('🔑 Role:', parsed.user?.role);
+      console.log('🎫 Token:', parsed.token ? 'Present' : 'Missing');
       
       return {
         isAuthenticated: true,
@@ -72,13 +68,16 @@ export const authService = {
 
   /**
    * Save session after successful login
-   * @param {string} token - JWT token from backend
-   * @param {Object} user - User object { id, email, name, role }
    */
-  saveSession: (token, user) => {
+  saveSession: (session) => {
     console.log('💾 Saving session...');
     
-    if (!token || !user) {
+    // Handle both calling styles
+    let token, user;
+    if (session.token && session.user) {
+      token = session.token;
+      user = session.user;
+    } else {
       console.error('❌ Invalid session data - token or user missing');
       return null;
     }
@@ -94,8 +93,9 @@ export const authService = {
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionCache));
       console.log('✅ Session saved successfully');
-      console.log('👤 User:', user.email || user.name);
+      console.log('👤 User:', user.email);
       console.log('🔑 Role:', user.role);
+      console.log('🎫 Token:', token ? 'Saved' : 'Missing');
       console.log('⏰ Expires:', new Date(expiresAt).toLocaleString());
     } catch (error) {
       console.error('❌ Error saving session to storage:', error);
@@ -106,8 +106,6 @@ export const authService = {
 
   /**
    * Get current session
-   * Checks validity and returns session or null
-   * @returns {Object|null} Session object or null if expired/invalid
    */
   getSession: () => {
     // Check if session exists in cache
@@ -126,12 +124,12 @@ export const authService = {
       return null;
     }
 
+    console.log('📋 Getting session - Token present:', !!sessionCache.token);
     return sessionCache;
   },
 
   /**
    * Get current user
-   * @returns {Object|null} User object or null
    */
   getUser: () => {
     const session = authService.getSession();
@@ -140,29 +138,32 @@ export const authService = {
 
   /**
    * Get current token
-   * @returns {string|null} JWT token or null
    */
   getToken: () => {
     const session = authService.getSession();
-    return session?.token || null;
+    const token = session?.token || null;
+    console.log('🎫 Getting token:', token ? 'Present' : 'Missing');
+    return token;
   },
 
   /**
    * Check if user is authenticated
-   * @returns {boolean}
    */
   isAuthenticated: () => {
     const session = authService.getSession();
-    return !!(session && session.token && session.user);
+    const isAuth = !!(session && session.token && session.user);
+    console.log('🔐 Is authenticated:', isAuth);
+    return isAuth;
   },
 
   /**
    * Check if current user is admin
-   * @returns {boolean}
    */
   isAdmin: () => {
     const session = authService.getSession();
-    return session?.user?.role === 'admin';
+    const isAdmin = session?.user?.role === 'admin';
+    console.log('👑 Is admin:', isAdmin);
+    return isAdmin;
   },
 
   /**
@@ -196,26 +197,26 @@ export const authService = {
 
   /**
    * Get authorization header for API calls
-   * @returns {Object} Headers object with Authorization if logged in
    */
   getAuthHeader: () => {
     const session = authService.getSession();
     
     if (session?.token) {
+      console.log('🔑 Auth header with token');
       return {
         'Authorization': `Bearer ${session.token}`,
         'Content-Type': 'application/json'
       };
     }
     
+    console.log('⚠️ Auth header without token');
     return {
       'Content-Type': 'application/json'
     };
   },
 
   /**
-   * Check if session needs refresh (expires in less than 1 hour)
-   * @returns {boolean}
+   * Check if session needs refresh
    */
   needsRefresh: () => {
     const session = authService.getSession();
@@ -242,9 +243,8 @@ export const authService = {
   }
 };
 
-// Auto-initialize on import (optional, but helpful)
+// Auto-initialize on import
 if (typeof window !== 'undefined') {
-  // Only run in browser environment
   authService.initializeAuth();
 }
 

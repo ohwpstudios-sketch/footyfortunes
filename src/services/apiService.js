@@ -1,4 +1,4 @@
-// apiService.js - Create this file in src/services folder
+// apiService.js - Complete API Service with all endpoints
 
 import authService from './authService';
 
@@ -10,20 +10,28 @@ console.log('🔍 VITE_API_URL:', import.meta.env.VITE_API_URL);
 // Generic fetch wrapper with error handling
 const apiFetch = async (endpoint, options = {}) => {
   try {
+    const authHeaders = authService.getAuthHeader();
+    console.log('🔑 Auth headers for', endpoint, ':', authHeaders);
+    
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
-        ...authService.getAuthHeader(),
+        'Content-Type': 'application/json',
+        ...authHeaders,
         ...options.headers
       }
     });
 
+    console.log('📡 Response status for', endpoint, ':', response.status);
+    
     const data = await response.json();
+    console.log('📦 Response data for', endpoint, ':', data);
     
     // Handle 401 Unauthorized (session expired)
     if (response.status === 401) {
+      console.error('🚫 Unauthorized - clearing session');
       authService.clearSession();
-      window.location.href = '/login';
+      window.location.href = '/';
       throw new Error('Session expired. Please login again.');
     }
 
@@ -33,7 +41,7 @@ const apiFetch = async (endpoint, options = {}) => {
       data
     };
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('❌ API Error for', endpoint, ':', error);
     throw error;
   }
 };
@@ -41,14 +49,15 @@ const apiFetch = async (endpoint, options = {}) => {
 export const apiService = {
   // ============ AUTH ENDPOINTS ============
   login: async (email, password) => {
-    return apiFetch('/api/auth/login', {  // ✅ FIXED - Added /api
+    console.log('🔐 Attempting login for:', email);
+    return apiFetch('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
   },
 
   register: async (email, password) => {
-    return apiFetch('/api/auth/register', {  // ✅ FIXED - Added /api
+    return apiFetch('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
@@ -149,6 +158,13 @@ export const apiService = {
         method: 'DELETE'
       });
     },
+	
+	createUser: async (userData) => {
+  return apiFetch('/api/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(userData)
+  });
+},
 
     // SUBSCRIBER MANAGEMENT
     getAllSubscribers: async () => {

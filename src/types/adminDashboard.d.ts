@@ -1,4 +1,4 @@
-// src/types/admin-dashboard.d.ts
+// src/types/adminDashboard.d.ts
 import React from 'react';
 
 type Role = 'user' | 'admin';
@@ -6,7 +6,6 @@ type Role = 'user' | 'admin';
 export interface AdminDashboardUser {
   email: string;
   role: Role;
-  token?: string;
 }
 
 export interface AdminDashboardProps {

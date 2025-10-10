@@ -1,4 +1,4 @@
-// index.js - Complete Cloudflare Worker (ALL-IN-ONE)
+// index.js - Complete Cloudflare Worker with Subscriber Delete
 // Place this single file in your worker directory and deploy
 
 // ============================================
@@ -70,7 +70,6 @@ async function handleLogin(request, env, corsHeaders) {
       }, 401, corsHeaders);
     }
 
-    // In production, use bcrypt to compare hashed passwords
     if (user.password_hash !== password) {
       return jsonResponse({ 
         success: false, 
@@ -622,6 +621,60 @@ async function handleUpdateUserStatus(userId, request, env, corsHeaders) {
   }
 }
 
+async function handleCreateUser(request, env, corsHeaders) {
+  try {
+    const { email, password, role, status } = await request.json();
+
+    if (!email || !password) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'Email and password are required' 
+      }, 400, corsHeaders);
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'Invalid email format' 
+      }, 400, corsHeaders);
+    }
+
+    const existing = await env.DB.prepare(
+      'SELECT id FROM users WHERE email = ?'
+    ).bind(email).first();
+
+    if (existing) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'Email already registered' 
+      }, 409, corsHeaders);
+    }
+
+    const result = await env.DB.prepare(
+      'INSERT INTO users (email, password_hash, role, status, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).bind(
+      email,
+      password,
+      role || 'user',
+      status || 'active',
+      new Date().toISOString()
+    ).run();
+
+    return jsonResponse({ 
+      success: true,
+      message: 'User created successfully',
+      userId: result.meta.last_row_id
+    }, 201, corsHeaders);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    return jsonResponse({ 
+      success: false, 
+      error: 'Failed to create user' 
+    }, 500, corsHeaders);
+  }
+}
+
 // ============================================
 // ADMIN SUBSCRIBER HANDLERS
 // ============================================
@@ -644,6 +697,32 @@ async function handleGetAllSubscribers(env, corsHeaders) {
     return jsonResponse({ 
       success: false, 
       error: 'Failed to fetch subscribers' 
+    }, 500, corsHeaders);
+  }
+}
+
+async function handleDeleteSubscriber(subscriberId, env, corsHeaders) {
+  try {
+    const result = await env.DB.prepare(
+      'DELETE FROM subscribers WHERE id = ?'
+    ).bind(subscriberId).run();
+
+    if (result.meta.changes === 0) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'Subscriber not found' 
+      }, 404, corsHeaders);
+    }
+
+    return jsonResponse({ 
+      success: true,
+      message: 'Subscriber deleted successfully'
+    }, 200, corsHeaders);
+  } catch (error) {
+    console.error('Error deleting subscriber:', error);
+    return jsonResponse({ 
+      success: false, 
+      error: 'Failed to delete subscriber' 
     }, 500, corsHeaders);
   }
 }
@@ -713,6 +792,72 @@ async function handleUpdateSettings(request, env, corsHeaders) {
   }
 }
 
+async function handleFileUpload(request, env, corsHeaders) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file');
+    const type = formData.get('type'); // 'logo' or 'favicon'
+
+    if (!file) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'No file provided' 
+      }, 400, corsHeaders);
+    }
+
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/x-icon'];
+    if (!validTypes.includes(file.type)) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'Invalid file type. Supported: PNG, JPG, SVG, ICO' 
+      }, 400, corsHeaders);
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'File size must be less than 2MB' 
+      }, 400, corsHeaders);
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `${type}-${timestamp}.${fileExtension}`;
+
+    // Upload to R2
+    await env.UPLOADS.put(fileName, file.stream(), {
+      httpMetadata: {
+        contentType: file.type
+      }
+    });
+
+    // Generate public URL
+    // Note: You'll need to set up a custom domain or use R2 public buckets
+    // For now, we'll use the bucket URL format
+    const publicUrl = `https://cdn.footyfortunes.win/${fileName}`;
+
+    console.log('✅ File uploaded:', fileName);
+
+    return jsonResponse({ 
+      success: true,
+      url: publicUrl,
+      filename: fileName,
+      message: 'File uploaded successfully'
+    }, 200, corsHeaders);
+
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    return jsonResponse({ 
+      success: false, 
+      error: 'Failed to upload file',
+      details: error.message
+    }, 500, corsHeaders);
+  }
+}
+
 // ============================================
 // MAIN WORKER EXPORT
 // ============================================
@@ -755,14 +900,14 @@ export default {
       if (path.startsWith('/api/admin/')) {
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return jsonResponse({ error: 'Unauthorized' }, 401, corsHeaders);
+          return jsonResponse({ success: false, error: 'Unauthorized' }, 401, corsHeaders);
         }
 
         const token = authHeader.substring(7);
         const user = await verifyToken(token, env);
         
         if (!user || user.role !== 'admin') {
-          return jsonResponse({ error: 'Forbidden: Admin access required' }, 403, corsHeaders);
+          return jsonResponse({ success: false, error: 'Forbidden: Admin access required' }, 403, corsHeaders);
         }
 
         if (path === '/api/admin/stats' && request.method === 'GET') {
@@ -793,6 +938,11 @@ export default {
         if (path === '/api/admin/users' && request.method === 'GET') {
           return handleGetAllUsers(env, corsHeaders);
         }
+		
+		if (path === '/api/admin/users' && request.method === 'POST') {
+  return handleCreateUser(request, env, corsHeaders);
+}
+
         if (path.match(/^\/api\/admin\/users\/[^\/]+\/role$/) && request.method === 'PUT') {
           const userId = path.split('/')[4];
           return handleUpdateUserRole(userId, request, env, corsHeaders);
@@ -805,6 +955,10 @@ export default {
         if (path === '/api/admin/subscribers' && request.method === 'GET') {
           return handleGetAllSubscribers(env, corsHeaders);
         }
+        if (path.match(/^\/api\/admin\/subscribers\/[^\/]+$/) && request.method === 'DELETE') {
+          const subscriberId = path.split('/').pop();
+          return handleDeleteSubscriber(subscriberId, env, corsHeaders);
+        }
 
         if (path === '/api/admin/settings' && request.method === 'GET') {
           return handleGetSettings(env, corsHeaders);
@@ -812,13 +966,18 @@ export default {
         if (path === '/api/admin/settings' && request.method === 'PUT') {
           return handleUpdateSettings(request, env, corsHeaders);
         }
+		
+		if (path === '/api/admin/upload' && request.method === 'POST') {
+  return handleFileUpload(request, env, corsHeaders);
+}
       }
 
-      return jsonResponse({ error: 'Endpoint not found' }, 404, corsHeaders);
+      return jsonResponse({ success: false, error: 'Endpoint not found' }, 404, corsHeaders);
 
     } catch (error) {
       console.error('Worker error:', error);
       return jsonResponse({ 
+        success: false,
         error: 'Internal server error',
         message: error.message 
       }, 500, corsHeaders);

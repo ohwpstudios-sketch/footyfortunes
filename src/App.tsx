@@ -1,6 +1,7 @@
 import authService from './services/authService';
 import apiService from './services/apiService';
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import AdminDashboard from './components/AdminDashboard';
 import { 
   Trophy, TrendingUp, Target, Calendar, Clock, BarChart3, 
@@ -63,10 +64,8 @@ interface ArchiveData {
   stats: ArchiveStats;
 }
 
-
 // Mock API functions (replace with actual Cloudflare Workers API calls)
 const api = {
-  // Login: mydaily2plusodds@gmail.com / angels2G9@84? -> role: 'admin', else 'user'
   login: async (email: string, password: string) => {
     const isAdmin =
       email.trim().toLowerCase() === 'mydaily2plusodds@gmail.com' &&
@@ -82,7 +81,6 @@ const api = {
     };
   },
 
-  // Register: everyone is created as a normal user in this mock
   register: async (email: string, password: string) => {
     return {
       success: true,
@@ -94,7 +92,6 @@ const api = {
     };
   },
 
-  // Today’s picks: demo payload
   getTodaysPicks: async () => {
     return {
       success: true,
@@ -139,7 +136,6 @@ const api = {
     };
   },
 
-  // Archive: demo payload
   getArchive: async () => {
     return {
       success: true,
@@ -163,38 +159,26 @@ const App = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<UserType | null>(null);
-  const [currentPage, setCurrentPage] = useState<'home'|'login'|'register'|'dashboard'|'archive'|'admin-dashboard'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [todaysPicks, setTodaysPicks] = useState<TodayPicks | null>(null);
   const [archive, setArchive] = useState<ArchiveData | null>(null);
   const [loading, setLoading] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
   
-  // Initialize authentication on app load
-useEffect(() => {
-  const authState = authService.initializeAuth();
+  useEffect(() => {
+    const authState = authService.initializeAuth();
 
-  if (authState.isAuthenticated && authState.user) {
-    setIsAuthenticated(true);
+    if (authState.isAuthenticated && authState.user) {
+      setIsAuthenticated(true);
 
-    // Ensure the user matches your TypeScript types
-    const typedUser: UserType = {
-      email: authState.user.email,
-      role: authState.user.role as Role,
-    };
-    setUser(typedUser);
+      const typedUser: UserType = {
+        email: authState.user.email,
+        role: authState.user.role as Role,
+      };
+      setUser(typedUser);
 
-    // Redirect admin users to admin dashboard; others to dashboard
-    if (authState.user.role === 'admin') {
-      setCurrentPage('admin-dashboard');
-    } else {
-      setCurrentPage('dashboard');
     }
-  }
-}, []);
-
-
-  // Authentication persists only during the session (in-memory)
+  }, []);
 
   useEffect(() => {
     if (darkMode) {
@@ -204,46 +188,40 @@ useEffect(() => {
     }
   }, [darkMode]);
 
-const handleLogin = async (email: string, password: string) => {
-  setLoading(true);
-  try {
-    // axios-style: returns { data }
-    const { data } = await apiService.login(email, password);
+  const handleLogin = async (email: string, password: string) => {
+    setLoading(true);
+    try {
+      const { data } = await apiService.login(email, password);
 
-    if (data.success) {
-      // Type the user for TS
-      const typedUser: UserType = {
-        email: data.user.email,
-        role: data.user.role as Role,
-      };
+      if (data.success) {
+        const typedUser: UserType = {
+          email: data.user.email,
+          role: data.user.role as Role,
+        };
 
-      // Save session using the single-argument (object) form
-      authService.saveSession({ token: data.token, user: typedUser });
+        authService.saveSession({ token: data.token, user: typedUser });
 
-      setIsAuthenticated(true);
-      setUser(typedUser);
+        setIsAuthenticated(true);
+        setUser(typedUser);
 
-      // Route based on role
-      setCurrentPage(typedUser.role === 'admin' ? 'admin-dashboard' : 'dashboard');
-    } else {
-      // data.error is optional; fall back to a generic message
-      alert(data.error ?? 'Login failed');
+        window.location.href = typedUser.role === 'admin' ? '/admin' : '/dashboard';
+      } else {
+        alert(data.error ?? 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Login error:', error);
-    alert('Login failed. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const handleLogout = () => {
-  authService.clearSession();
-  setIsAuthenticated(false);
-  setUser(null);
-  setCurrentPage('home');
-};
+    authService.clearSession();
+    setIsAuthenticated(false);
+    setUser(null);
+    window.location.href = '/';
+  };
 
   const loadTodaysPicks = async () => {
     setLoading(true);
@@ -271,19 +249,11 @@ const handleLogin = async (email: string, password: string) => {
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (currentPage === 'dashboard' && !todaysPicks) {
-      loadTodaysPicks();
-    }
-    if (currentPage === 'archive' && !archive) {
-      loadArchive();
-    }
-  }, [currentPage]);
+
 
   // Landing Page Component
   const LandingPage = () => (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900">
-      {/* Header */}
       <header className="fixed top-0 w-full bg-black/20 backdrop-blur-md z-50 border-b border-white/10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -295,13 +265,13 @@ const handleLogin = async (email: string, password: string) => {
             <a href="#how-it-works" className="text-white/80 hover:text-white transition">How it Works</a>
             <a href="#pricing" className="text-white/80 hover:text-white transition">Pricing</a>
             <button
-              onClick={() => setCurrentPage('login')}
+              onClick={() => window.location.href = '/login'}
               className="px-4 py-2 text-white/80 hover:text-white transition"
             >
               Login
             </button>
             <button
-              onClick={() => setCurrentPage('register')}
+              onClick={() => window.location.href = '/register'}
               className="px-6 py-2 bg-yellow-400 text-emerald-900 rounded-lg font-semibold hover:bg-yellow-300 transition"
             >
               Get Started
@@ -313,7 +283,6 @@ const handleLogin = async (email: string, password: string) => {
         </div>
       </header>
 
-      {/* Hero Section */}
       <section className="pt-32 pb-20 px-4">
         <div className="container mx-auto text-center">
           <div className="inline-block px-4 py-2 bg-yellow-400/20 rounded-full text-yellow-400 text-sm font-semibold mb-6">
@@ -330,7 +299,7 @@ const handleLogin = async (email: string, password: string) => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => setCurrentPage('register')}
+              onClick={() => window.location.href = '/register'}
               className="px-8 py-4 bg-yellow-400 text-emerald-900 rounded-lg font-bold text-lg hover:bg-yellow-300 transition transform hover:scale-105"
             >
               Start Free Trial
@@ -340,7 +309,6 @@ const handleLogin = async (email: string, password: string) => {
             </button>
           </div>
 
-          {/* Stats */}
           <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
             {[
               { label: 'Win Rate', value: '63.3%', icon: TrendingUp },
@@ -358,7 +326,6 @@ const handleLogin = async (email: string, password: string) => {
         </div>
       </section>
 
-      {/* Features Section */}
       <section id="features" className="py-20 bg-black/20">
         <div className="container mx-auto px-4">
           <h2 className="text-4xl font-bold text-white text-center mb-12">
@@ -407,7 +374,6 @@ const handleLogin = async (email: string, password: string) => {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
           <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-2xl p-12">
@@ -418,7 +384,7 @@ const handleLogin = async (email: string, password: string) => {
               Join thousands of successful bettors using AI-powered predictions
             </p>
             <button
-              onClick={() => setCurrentPage('register')}
+              onClick={() => window.location.href = '/register'}
               className="px-8 py-4 bg-emerald-900 text-yellow-400 rounded-lg font-bold text-lg hover:bg-emerald-800 transition"
             >
               Get Started Free
@@ -427,7 +393,6 @@ const handleLogin = async (email: string, password: string) => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-black/40 py-12 border-t border-white/10">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8">
@@ -473,27 +438,25 @@ const handleLogin = async (email: string, password: string) => {
     </div>
   );
 
-  // Auth Pages
   interface AuthPageProps {
-  mode: 'login' | 'register';
-}
+    mode: 'login' | 'register';
+  }
 
-const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
+    const [email, setEmail] = useState<string>('');
+    const [password, setPassword] = useState<string>('');
+    const [showPassword, setShowPassword] = useState<boolean>(false);
 
-  const handleSubmit = async () => {
-    if (mode === 'login') {
-      await handleLogin(email, password);
-    } else {
-      const response = await api.register(email, password);
-      if (response.success) {
+    const handleSubmit = async () => {
+      if (mode === 'login') {
         await handleLogin(email, password);
+      } else {
+        const response = await api.register(email, password);
+        if (response.success) {
+          await handleLogin(email, password);
+        }
       }
-    }
-  };
-
+    };
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 flex items-center justify-center px-4">
@@ -549,7 +512,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setCurrentPage(mode === 'login' ? 'register' : 'login')}
+              onClick={() => window.location.href = mode === 'login' ? '/register' : '/login'}
               className="text-yellow-400 hover:text-yellow-300 text-sm"
             >
               {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
@@ -557,7 +520,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           </div>
 
           <button
-            onClick={() => setCurrentPage('home')}
+            onClick={() => window.location.href = '/'}
             className="mt-4 w-full text-white/60 hover:text-white text-sm"
           >
             ← Back to home
@@ -567,13 +530,19 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     );
   };
 
-  // Dashboard Component
   const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('today');
+	useEffect(() => {
+  if (activeTab === 'today' && !todaysPicks) {
+    loadTodaysPicks();
+  }
+  if (activeTab === 'archive' && !archive) {
+    loadArchive();
+  }
+}, [activeTab]);
 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Navigation */}
         <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between h-16">
@@ -628,7 +597,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           </div>
         </nav>
 
-        {/* Content */}
         <div className="container mx-auto px-4 py-8">
           {activeTab === 'today' && <TodaysPicks picks={todaysPicks} loading={loading} onRefresh={loadTodaysPicks} />}
           {activeTab === 'archive' && <ArchiveView archive={archive} loading={loading} />}
@@ -639,12 +607,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     );
   };
 
-  // Today's Picks Component
   const TodaysPicks: React.FC<{
-  picks: TodayPicks | null;
-  loading: boolean;
-  onRefresh: () => void;
-}> = ({ picks, loading, onRefresh }) => {
+    picks: TodayPicks | null;
+    loading: boolean;
+    onRefresh: () => void;
+  }> = ({ picks, loading, onRefresh }) => {
     if (loading) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -671,7 +638,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
     return (
       <div className="space-y-6">
-        {/* Header Card */}
         <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-2xl p-8 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -700,7 +666,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           </div>
         </div>
 
-        {/* Matches */}
         <div className="grid gap-4">
           {picks.matches.map((match: Match) => (
             <div key={match.id} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition">
@@ -734,19 +699,18 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           ))}
         </div>
 
-        {/* Potential Return */}
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Potential Return</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">If all picks win with $100 stake</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">If all picks win with GH₵100 stake</p>
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                ${(picks.combined_odds * 100).toFixed(2)}
+                GH₵{(picks.combined_odds * 100).toFixed(2)}
               </div>
               <div className="text-sm text-green-600 dark:text-green-400">
-                +${((picks.combined_odds - 1) * 100).toFixed(2)} profit
+                +GH₵{((picks.combined_odds - 1) * 100).toFixed(2)} profit
               </div>
             </div>
           </div>
@@ -755,11 +719,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     );
   };
 
-  // Archive View
   const ArchiveView: React.FC<{
-  archive: ArchiveData | null;
-  loading: boolean;
-}> = ({ archive, loading }) => {
+    archive: ArchiveData | null;
+    loading: boolean;
+  }> = ({ archive, loading }) => {
     if (loading) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -772,7 +735,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
     return (
       <div className="space-y-6">
-        {/* Stats Overview */}
         <div className="grid md:grid-cols-4 gap-4">
           {[
             { label: 'Total Picks', value: archive.stats.totalPicks, icon: Target, color: 'blue' },
@@ -790,7 +752,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           ))}
         </div>
 
-        {/* ROI Card */}
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -801,7 +762,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           </div>
         </div>
 
-        {/* Archive List */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historical Picks</h2>
@@ -839,7 +799,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     );
   };
 
-  // Betting Calculator
   const BettingCalculator = () => {
     const [stake, setStake] = useState(100);
     const [odds1, setOdds1] = useState(1.65);
@@ -847,9 +806,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     const [odds3, setOdds3] = useState(1.55);
 
     const totalOddsNum = (odds1 * odds2 * odds3);
-	const totalOdds = totalOddsNum.toFixed(2);
-	const potentialReturn = (stake * totalOddsNum).toFixed(2);
-	const profit = (Number(potentialReturn) - stake).toFixed(2);
+    const totalOdds = totalOddsNum.toFixed(2);
+    const potentialReturn = (stake * totalOddsNum).toFixed(2);
+    const profit = (Number(potentialReturn) - stake).toFixed(2);
 
     return (
       <div className="max-w-2xl mx-auto">
@@ -862,7 +821,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Stake Amount ($)
+                Stake Amount (GH₵)
               </label>
               <input
                 type="number"
@@ -901,11 +860,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Potential Return</span>
-                <span className="text-2xl font-bold text-green-600 dark:text-green-400">${potentialReturn}</span>
+                <span className="text-2xl font-bold text-green-600 dark:text-green-400">GH₵{potentialReturn}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Profit</span>
-                <span className="text-2xl font-bold text-green-600 dark:text-green-400">+${profit}</span>
+                <span className="text-2xl font-bold text-green-600 dark:text-green-400">+GH₵{profit}</span>
               </div>
             </div>
           </div>
@@ -914,7 +873,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     );
   };
 
-  // Profile View
   const ProfileView: React.FC<{ user: UserType | null }> = ({ user }) => {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
@@ -954,26 +912,27 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     );
   };
 
-  // Main Render
   return (
-  <div className={darkMode ? 'dark' : ''}>
-    {!isAuthenticated && currentPage === 'home' && <LandingPage />}
-    {!isAuthenticated && currentPage === 'login' && <AuthPage mode="login" />}
-    {!isAuthenticated && currentPage === 'register' && <AuthPage mode="register" />}
-
-    {/* ✅ Regular authenticated dashboard */}
-    {isAuthenticated && currentPage === 'dashboard' && <Dashboard />}
-
-    {/* 🆕 Admin dashboard route (only for admin users) */}
-    {isAuthenticated && currentPage === 'admin-dashboard' && user?.role === 'admin' && (
-      <AdminDashboard
-        user={{ ...user, token: authToken ?? '' }}
-        darkMode={darkMode}
-      />
-    )}
-  </div>
+  <BrowserRouter>
+    <div className={darkMode ? 'dark' : ''}>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={!isAuthenticated ? <LandingPage /> : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} />} />
+        <Route path="/login" element={!isAuthenticated ? <AuthPage mode="login" /> : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} />} />
+        <Route path="/register" element={!isAuthenticated ? <AuthPage mode="register" /> : <Navigate to="/dashboard" />} />
+        
+        {/* User Dashboard Route */}
+        <Route path="/dashboard" element={isAuthenticated && user?.role === 'user' ? <Dashboard /> : <Navigate to="/login" />} />
+        
+        {/* Admin Dashboard Route */}
+        <Route path="/admin" element={isAuthenticated && user?.role === 'admin' ? <AdminDashboard user={user} darkMode={darkMode} /> : <Navigate to="/login" />} />
+        
+        {/* Catch all - redirect to home */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </div>
+  </BrowserRouter>
 );
 };
-
 
 export default App;
