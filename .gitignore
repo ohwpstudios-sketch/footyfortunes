@@ -12,3 +12,12 @@ dev files/
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+# !/docs/**
+# !/PROJECT_PROGRESS.md
+# !/CURRENT_SESSION.md
